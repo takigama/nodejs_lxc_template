@@ -1,0 +1,12 @@
+# there arent many config variables here
+# just ip address, hostname and gateway
+#debug=true
+ip4address=eth0:10.0.3.100/24
+ip4address=lo:127.0.0.1/8
+ip6address=eth0:auto
+hostname=nd
+ip4gateway=10.0.3.1
+ip6gateway=auto
+dnsserver=10.0.3.1
+random=whatever
+checktimer=1000

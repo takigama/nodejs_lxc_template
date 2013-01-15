@@ -1,0 +1,274 @@
+#!/bin/bash
+
+#
+# lxc: linux Container library
+
+# Authors:
+# Paul Robinson <takigama@gmail.com>
+
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+
+setup_node()
+{
+	user=$3
+    rootfs=$1
+    name=$2
+    
+    echo "Creating default configuration, $rootfs/config - EDIT THIS CONFIG"
+    
+    pushd $rootfs
+    cat > config <<EOF
+# there arent many config variables here
+# just ip address, hostname and gateway
+# debug=true
+ip4address=eth0:10.0.3.100/24
+ip4address=lo:127.0.0.1/8
+ip6address=eth0:auto
+hostname=nd
+ip4gateway=10.0.3.1
+ip6gateway=auto
+dnsserver=10.0.3.1
+checktimer=1000
+EOF
+	popd
+
+    pushd $rootfs
+	cat > node_base/config <<EOF
+# this is where a list of apps to startup are stored
+# format is:
+# appname:directory:commandline[:opts]
+myapp:/node_code/somethingorother:dontrestart
+EOF
+	popd
+}
+
+
+install_node()
+{
+	user=$3
+    rootfs=$1
+    name=$2
+    res=0
+    tree="\
+$rootfs/dev \
+$rootfs/sbin \
+$rootfs/proc \
+$rootfs/etc \
+$rootfs/tmp \
+$rootfs/dev/pts \
+$rootfs/dev/shm \
+$rootfs/lib \
+$rootfs/usr/lib \
+$rootfs/node_modules \
+$rootfs/node_base \
+$rootfs/node_base/control \
+$rootfs/node_base/logs \
+$rootfs/lib64 \
+$rootfs/usr/lib64"
+
+	mkdir -p $tree || return 1
+    chmod 755 $tree || return 1
+	
+    pushd $rootfs/dev > /dev/null || return 1
+
+    # minimal devices needed for busybox
+    mknod tty c 5 0       || res=1
+    mknod console c 5 1   || res=1
+    chmod 666 tty console || res=1
+    mknod tty0 c 4 0      || res=1
+    mknod tty1 c 4 0      || res=1
+    mknod tty5 c 4 0      || res=1
+    chmod 666 tty0        || res=1
+    mknod ram0 b 1 0      || res=1
+    chmod 600 ram0        || res=1
+    mknod null c 1 3      || res=1
+    chmod 666 null        || res=1
+
+
+	echo "Downloading latest nodejs binaries for linux x64"
+	#fname=/tmp/nodejs.$RANDOM.`date +%s`tar.gz
+	# TODO: DONT FORGET TO REMOVE THIS
+	fname=/tmp/nodejs.11298.tar.gz
+	#wget -O $fname http://nodejs.org/dist/v0.8.17/node-v0.8.17-linux-x64.tar.gz
+	
+	pushd $rootfs
+	tar xfz $fname
+	ln -s node*linux*64* node
+	popd
+	
+	pushd $rootfs
+	echo "Installing ip cmd from upper OS"
+	cp /sbin/ip ./sbin/
+	popd
+	
+	pushd $rootfs
+	echo "PWD is $PWD"
+	cat >> sbin/init <<EOF
+#!/node/bin/node
+
+var uid=$user
+var fs = require("fs");
+var mnt = require("/node_modules/mount");
+
+mnt.mount("proc", "/proc", "proc");
+
+console.log("starting scheduler");
+setTimeout(scheduler, 2000);
+setTimeout(startnode, 4000);
+
+
+function scheduler()
+{
+        console.log("scheduler called: ", process.getuid());
+
+        //fs.readdir("/proc", function(err, files) {
+                //console.log("files: ", files);
+        //});
+
+        setTimeout(scheduler, 2000);
+}
+
+function startnode() {
+        var opts = { uid: uid, gid: uid };
+        var nodespawn = require("child_process").spawn,
+            nodeproc = nodespawn("/node/bin/node", ["/node_code/nc.js"], opts);
+        nodeproc.stdout.on("data", function(data) {
+                console.log("data from nodespawn: " + data);
+        });
+        nodeproc.stderr.on("data", function(data) {
+                console.log("stderrdata from nodespawn: " + data);
+        });
+        nodeproc.on("exit", function(data) {
+                console.log("nodespawn died");
+        });
+}
+EOF
+
+	chmod a+x sbin/init
+	popd
+	
+	pushd $rootfs
+	echo "Installing mount via npm"
+	./node/bin/npm install mount
+	popd
+	
+	
+    return $res
+}
+
+
+copy_configuration()
+{
+    path=$1
+    rootfs=$2
+    name=$3
+
+cat <<EOF >> $path/config
+lxc.utsname = $name
+lxc.tty = 1
+lxc.pts = 1
+lxc.rootfs = $rootfs
+# uncomment the next line to run the container unconfined:
+#lxc.aa_profile = unconfined
+EOF
+
+if [ -d "$rootfs/lib" ]; then
+cat <<EOF >> $path/config
+lxc.mount.entry=/lib $rootfs/lib none ro,bind 0 0
+lxc.mount.entry=/usr/lib $rootfs/usr/lib none ro,bind 0 0
+EOF
+fi
+
+if [ -d "/lib64" ] && [ -d "$rootfs/lib64" ]; then
+cat <<EOF >> $path/config
+lxc.mount.entry=/lib64 $rootfs/lib64 none ro,bind 0 0
+EOF
+fi
+
+if [ -d "/usr/lib64" ] && [ -d "$rootfs/usr/lib64" ]; then
+cat <<EOF >> $path/config
+lxc.mount.entry=/usr/lib64 $rootfs/usr/lib64 none ro,bind 0 0
+EOF
+fi
+}
+
+usage()
+{
+    cat <<EOF
+$1 -h|--help -p|--path=<path> -u|--user=<uid> -i|--ip=<ip>
+EOF
+    return 0
+}
+
+user=0
+ip_last=$(($RANDOM%100+100))
+ip=10.0.3.$ip_last/24
+
+options=$(getopt -o hp:u:n:i:g: -l help,path:,user:,name:,ip:,gateway: -- "$@")
+if [ $? -ne 0 ]; then
+        usage $(basename $0)
+	exit 1
+fi
+eval set -- "$options"
+
+while true
+do
+    case "$1" in
+        -h|--help)      usage $0 && exit 0;;
+        -u|--user)		user=$2; shift 2;;
+        -i|--ip)		ip=$2; shift 2;;
+        -g|--gateway)		gw=$2; shift 2;;
+        -p|--path)      path=$2; shift 2;;
+	-n|--name)      name=$2; shift 2;;
+        --)             shift 1; break ;;
+        *)              break ;;
+    esac
+done
+
+if [ "$(id -u)" != "0" ]; then
+    echo "This script should be run as 'root'"
+    exit 1
+fi
+
+if [ -z "$path" ]; then
+    echo "'path' parameter is required"
+    exit 1
+fi
+
+rootfs=$path/rootfs
+
+install_node $rootfs $name $user
+if [ $? -ne 0 ]; then
+    echo "failed to install the nodejs rootfs"
+    exit 1
+fi
+
+setup_node $rootfs $name $user
+if [ $? -ne 0 ]; then
+	echo "Failed to setup node"
+	exit 1
+fi
+
+echo "sleeping for check - 20s"
+#sleep 20
+
+echo Params are, $user, $path, $name
+#exit 1
+
+copy_configuration $path $rootfs $name
+if [ $? -ne 0 ]; then
+    echo "failed to write configuration file"
+    exit 1
+fi

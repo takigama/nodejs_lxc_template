@@ -1,0 +1,12 @@
+# this is an appconfig file
+# it has the format of:
+# appname:directory:appfilepath[:options]
+# where 
+# 	appname is an internally used name to identify the app
+#	directory is the directory to start the app from
+#	appfilepath is the path to the js file to start
+#	options is a set of options such as norestart to not restart application on a failure
+appname1:.:/node/app.js
+appname2:.:/node/app.js
+appname3:.:/node/app.js
+appname4:.:/node/app.js
