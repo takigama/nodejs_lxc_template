@@ -49,7 +49,8 @@ foreach($versions as $key => $val) {
 //var_dump($fver);
 
 echo "dumping to versions file\n";
-$versfilename = "./versions_file.".date("Ymd");
+$versdate = date("Ymd");
+$versfilename = "./versions_file.$versdate";
 $versfile = fopen("$versfilename", "w");
 if($versfile !== false) {
 	fwrite($versfile, "baseurl:$baseurl\n");
@@ -64,7 +65,7 @@ if($versfile !== false) {
 	// create a current versions file
 	$cv = fopen("current_version", "w");
 	if($cv !== false) {
-		fwrite($cv, "version:$versfilename\n");
+		fwrite($cv, "version:$versdate\n");
 		fclose($cv);
 	}
 } else {
