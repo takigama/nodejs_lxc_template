@@ -49,16 +49,28 @@ foreach($versions as $key => $val) {
 //var_dump($fver);
 
 echo "dumping to versions file\n";
-$versfile = fopen("./versions_file", "w");
+$versfilename = "./versions_file.".date("Ymd");
+$versfile = fopen("$versfilename", "w");
 if($versfile !== false) {
 	fwrite($versfile, "baseurl:$baseurl\n");
 	foreach($fver as $line) {
 		fwrite($versfile, "$line\n");
 	}
 	fclose($versfile);
+
+	// compress teh file
+	system("gzip -c $versfilename > $versfilename.gz");
+	
+	// create a current versions file
+	$cv = fopen("current_version", "w");
+	if($cv !== false) {
+		fwrite($cv, "version:$versfilename\n");
+		fclose($cv);
+	}
 } else {
 	echo "Failed to open vers file!\n";	
 }
+
 
 function checkFilesList($url, $vers, $fileslist) {
 	global $fver, $baseurl, $fvern;
