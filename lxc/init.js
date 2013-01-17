@@ -1,5 +1,7 @@
 #!/node/bin/node
 
+// VERSION_FOR_PARSER: 0.0.1
+
 //var uid=$user
 var fs = require("fs");
 var asroot = false;

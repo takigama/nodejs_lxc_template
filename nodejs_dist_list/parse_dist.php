@@ -48,6 +48,48 @@ foreach($versions as $key => $val) {
 //echo "and fver is now\n";
 //var_dump($fver);
 
+echo "finding max versions\n";
+$maxstable[0] = 0;
+$maxstable[1] = 0;
+$maxstable[2] = 0;
+$maxdev[0] = 0;
+$maxdev[1] = 0;
+$maxdev[2] = 0;
+foreach($versions as $key => $val) {
+	$vspl = explode(".", $key);
+	if(($vspl[1]%2) == 1) {
+		// dev
+		if($vspl[0] >= $maxdev[0]) {
+			if($vspl[1] >= $maxdev[1]) {
+				if($vspl[2] >= $maxdev[2]) {
+					$maxdev[0] = $vspl[0];
+					$maxdev[1] = $vspl[1];
+					$maxdev[2] = $vspl[2];
+				}
+			}
+		}
+	} else {
+		// stable
+		if($vspl[0] >= $maxstable[0]) {
+			if($vspl[1] >= $maxstable[1]) {
+				if($vspl[2] >= $maxstable[2]) {
+					$maxstable[0] = $vspl[0];
+					$maxstable[1] = $vspl[1];
+					$maxstable[2] = $vspl[2];
+				}
+			}
+		}
+	}
+}
+
+echo "getting init version\n";
+$initvers_l = explode("\n", file_get_contents("../lxc/init.js"));
+$initvers_t = preg_grep("/.*VERSION_FOR_PARSER.*/", $initvers_l);
+foreach($initvers_t as $val) {
+        $cpl = explode(":", $val);
+        $initvers = trim($cpl[1]);
+}
+
 echo "dumping to versions file\n";
 $versdate = date("Ymd");
 $versfilename = "./versions_file.$versdate";
@@ -66,6 +108,9 @@ if($versfile !== false) {
 	$cv = fopen("current_version", "w");
 	if($cv !== false) {
 		fwrite($cv, "version:$versdate\n");
+		fwrite($cv, "stable:".$maxstable[0].".".$maxstable[1].".".$maxstable[2]."\n");
+		fwrite($cv, "dev:".$maxdev[0].".".$maxdev[1].".".$maxdev[2]."\n");
+		fwrite($cv, "nodejs:$initvers\n");
 		fclose($cv);
 	}
 } else {
