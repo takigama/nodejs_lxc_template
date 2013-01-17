@@ -92,7 +92,7 @@ foreach($initvers_t as $val) {
 
 echo "dumping to versions file\n";
 $versdate = date("Ymd");
-$versfilename = "./versions_file.$versdate";
+$versfilename = "./versions/versions_file.$versdate";
 $versfile = fopen("$versfilename", "w");
 if($versfile !== false) {
 	fwrite($versfile, "baseurl:$baseurl\n");
@@ -102,10 +102,10 @@ if($versfile !== false) {
 	fclose($versfile);
 
 	// compress teh file
-	system("gzip -c $versfilename > $versfilename.gz");
+	system("gzip -c versions/$versfilename > versions/$versfilename.gz");
 	
 	// create a current versions file
-	$cv = fopen("current_version", "w");
+	$cv = fopen("versions/current_version", "w");
 	if($cv !== false) {
 		fwrite($cv, "version:$versdate\n");
 		fwrite($cv, "stable:".$maxstable[0].".".$maxstable[1].".".$maxstable[2]."\n");
