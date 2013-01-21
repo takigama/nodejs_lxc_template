@@ -1,5 +1,6 @@
 #!/node/bin/node
 
+// this next line is used by the parse_dist.php bit to create its version info
 // VERSION_FOR_PARSER: 0.0.1
 
 //var uid=$user
