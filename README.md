@@ -1,3 +1,13 @@
+Random Node.js code
+===================
+
+This is a simple repo of all my random node.js code that didnt belong being a repo of its own...
+
+In here you'll find the nodejs_lxc_template and a fake bgp daemon (really for testing bgp on various
+routers and so forth).
+
+
+
 nodejs_lxc_template
 ===================
 
@@ -24,4 +34,16 @@ The nodejs template currently doesnt work as it stands but in the long term what
 4) install the node binary
 5) setup the init nodejs script
 6) ... magic!
+
+
+
+
+
+BGP Daemon in Node.js
+=====================
+
+simple implementation of the bgp protocol stack - set your ip address and your AS and it'll publish a
+number of prefixes (can be changed part way down the code - up to about a million prefixes works without
+much drama)
+
 
