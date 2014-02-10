@@ -24,3 +24,4 @@ The nodejs template currently doesnt work as it stands but in the long term what
 4) install the node binary
 5) setup the init nodejs script
 6) ... magic!
+
