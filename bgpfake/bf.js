@@ -8,26 +8,42 @@ var scon;
 
 function createentry(i) {
 	// split into octets
-	var a = 16;
+	var a = 0;
 	var b = 0;
+	var c = 0;
+	
+	var x = 6619136;
 
+	//console.log("var x is "+x);
+	i = i+x;
+	//console.log("i now: "+i+" i>>8 "+i+" i>>16 "+(i>>16));
+	
+	c = i&255;
+	b = (i>>8)&255;
+	a = (i>>16)&255;
+	
+	/*
+	// BAH!
 	// c is easy...
 	var c = (i%255)+1;
 	//console.log("i is now: "+i);
 
 	// if we're above 256....
-	if(i>255) {
+	if(i>253) {
 		i = i >> 8;
 		//console.log("i is now: "+i);
 		b = i%255;
 	}
 
 	// if we're still above 256....
-	if(i>255) {
+	if(i>253) {
 		i = i >> 8;
 		//console.log("i is now: "+i);
-		a+=((i<<8)%255);
+		a+=(i%255)+1;
 	}
+	*/
+	
+	//console.log("created "+a+"."+b+"."+c+" from "+i);
 	return a+"."+b+"."+c;
 }
 
@@ -47,7 +63,7 @@ function createaspath(i) {
 console.log("startup....");
 
 
-var num_to_create = 200000;
+var num_to_create = 2000;
 
 var data = new Array();
 
@@ -239,9 +255,12 @@ function constructUpdateMessage(localdata) {
 
 // start sending updates messages
 function beginUpdateSend(c) {
+	var n = 0;
 	data.forEach(function(led) {
 		c.write(led[2]);
+		n++;
 	});
+	console.log("finished publishing - "+n);
 }
 
 function serverconnection(c) {
