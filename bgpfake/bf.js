@@ -22,26 +22,6 @@ function createentry(i) {
 	b = (i>>8)&255;
 	a = (i>>16)&255;
 	
-	/*
-	// BAH!
-	// c is easy...
-	var c = (i%255)+1;
-	//console.log("i is now: "+i);
-
-	// if we're above 256....
-	if(i>253) {
-		i = i >> 8;
-		//console.log("i is now: "+i);
-		b = i%255;
-	}
-
-	// if we're still above 256....
-	if(i>253) {
-		i = i >> 8;
-		//console.log("i is now: "+i);
-		a+=(i%255)+1;
-	}
-	*/
 	
 	//console.log("created "+a+"."+b+"."+c+" from "+i);
 	return a+"."+b+"."+c;
