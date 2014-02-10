@@ -1,5 +1,6 @@
 var myas=1234;
 var myip="10.99.99.1";
+var num_to_create = 2000000;
 
 var net = require('net');
 
@@ -12,7 +13,7 @@ function createentry(i) {
 	var b = 0;
 	var c = 0;
 	
-	var x = 6619136;
+	var x = 101<<16;
 
 	//console.log("var x is "+x);
 	i = i+x;
@@ -43,7 +44,6 @@ function createaspath(i) {
 console.log("startup....");
 
 
-var num_to_create = 2000;
 
 var data = new Array();
 
