@@ -1,6 +1,6 @@
 var myas=1234;
 var myip="10.99.99.1";
-var num_to_create = 2000000;
+var num_to_create = 400000;
 
 var net = require('net');
 
