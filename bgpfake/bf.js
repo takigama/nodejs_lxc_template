@@ -4,6 +4,8 @@ var num_to_create = 400000;
 
 var net = require('net');
 
+var updateSent = 0;
+
 var scon;
 
 
@@ -13,7 +15,7 @@ function createentry(i) {
 	var b = 0;
 	var c = 0;
 	
-	var x = 101<<16;
+	var x = 45<<16;
 
 	//console.log("var x is "+x);
 	i = i+x;
@@ -104,10 +106,11 @@ function parseBuffer(b, c) {
 		c.write(out);
 	} else if(type == 4) {
 		console.log("writing keepalive - exact as sent");
+		if(updateSent ==0) beginUpdateSend(c);
 		c.write(b);
 	} else if(type == 2) {
 		console.log("got update...");
-		beginUpdateSend(c);
+		if(updateSent ==0) beginUpdateSend(c);
 	} else {
 		console.log("sending end...");
 		c.end();
@@ -235,6 +238,7 @@ function constructUpdateMessage(localdata) {
 
 // start sending updates messages
 function beginUpdateSend(c) {
+	updateSent = 1;
 	var n = 0;
 	data.forEach(function(led) {
 		c.write(led[2]);
