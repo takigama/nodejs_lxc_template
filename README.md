@@ -35,3 +35,8 @@ The nodejs template currently doesnt work as it stands but in the long term what
 5) setup the init nodejs script
 6) ... magic!
 
+
+BGP FAKE PEER
+=============
+
+This has moved to its own repo - https://github.com/takigama/bgp-test-harness-nodejs
