@@ -1,6 +1,7 @@
-var myas=1234;
-var myip="10.99.99.1";
-var num_to_create = 400000;
+var myas=4321;
+var myip="10.10.40.1";
+var number_of_route_adverts = 6;
+var routes_per_advert = 4;
 
 var net = require('net');
 
@@ -50,29 +51,39 @@ console.log("startup....");
 var data = new Array();
 
 console.log("start construction");
-for(var t=0; t<num_to_create; t++) {
+for(var t=0; t<number_of_route_adverts; t++) {
 	var thisdata = new Array();
-	thisdata[0] = createentry(t);
-	//console.log("create entry from "+thisdata[0]+" with " + t);
-	thisdata[1] = createaspath(t);
-	// we construct the update messages while we do this
+	//var retvuf = new Buffer(1);
+	for(var b=0; b<routes_per_advert; b++) {
+		var nvt = (t*routes_per_advert)+b;
+		thisdata[0] = createentry(nvt);
+		//console.log("create entry from "+thisdata[0]+" with " + t);
+		if(b==0) thisdata[1] = createaspath(nvt);
+		// we construct the update messages while we do this
 
-	// ok, that was dumb
-	thisdata[2] = constructUpdateMessage(thisdata);
+		// ok, that was dumb
+		if(b>0) thisdata[2] += constructUpdateMessage(thisdata, true, routes_per_advert);
+		else thisdata[2] = constructUpdateMessage(thisdata, false, routes_per_advert);
+	}
+	console.log("thisdata is...");
+	console.log(thisdata);
+	//console.log(thisdata.toJSON());
+	console.log(thisdata[2].length);
+	console.log(thisdata[2].toString());
 	data[t] = thisdata;
-
 }
 console.log("finish construction");
 
 
 //console.log("data: " + data.toString());
+//console.log(data);
 //console.log("Done!: " + data.length);
 
 function parseBuffer(b, c) {
 	var len = b.readUInt16BE(16);
 	var type = b.readUInt8(18);
 
-	console.log("got input: " + len + ", type: " + type);
+	//console.log("got input: " + len + ", type: " + type);
 
 	if(type == 1) {
 		var vers = b.readUInt8(19);
@@ -106,8 +117,8 @@ function parseBuffer(b, c) {
 		c.write(out);
 	} else if(type == 4) {
 		console.log("writing keepalive - exact as sent");
-		if(updateSent ==0) beginUpdateSend(c);
 		c.write(b);
+		//if(updateSent ==0) beginUpdateSend(c);
 	} else if(type == 2) {
 		console.log("got update...");
 		if(updateSent ==0) beginUpdateSend(c);
@@ -121,14 +132,14 @@ function parseBuffer(b, c) {
 
 // this function gets prefix t from data[] and then
 // creates an update message for it
-function constructUpdateMessage(localdata) {
-	//console.log("Construction update for "+t);
+function constructUpdateMessage(localdata, onlynlri, n_up) {
+	console.log("Construction update for "+t);
 	var bsize = 0;
 
-	//console.log("localdata0: " + localdata[0]);
-	//console.log("localdata1: " + localdata[1]);
-	//console.log("localdata0 - : " + typeof localdata[1]);
-	//console.log("localdata1 - : " + typeof localdata[1]);
+	console.log("localdata0: " + localdata[0]);
+	console.log("localdata1: " + localdata[1]);
+	console.log("localdata0 - : " + typeof localdata[1]);
+	console.log("localdata1 - : " + typeof localdata[1]);
 
 	// first the header components
 	bsize += 16;
@@ -164,6 +175,9 @@ function constructUpdateMessage(localdata) {
 	// fudge
 	bsize+=1;
 
+	// now figure out t_bsize;
+	var t_bsize = bsize + (4*(n_up-1));
+
 	//console.log("size: " + bsize + ", an: " + aspathn + " al:" + aspathlen);
 	var buf = new Buffer(bsize);
 	var bp = 0;
@@ -171,7 +185,7 @@ function constructUpdateMessage(localdata) {
 	// now lets create the buffer
 	buf.fill(0xff, bp, bp+16);
 	bp+=16;
-	buf.writeUInt16BE(bsize, bp);
+	buf.writeUInt16BE(t_bsize, bp);
 	bp+=2;
 	buf.writeUInt8(2, bp);
 	bp++;
@@ -225,13 +239,22 @@ function constructUpdateMessage(localdata) {
 	}); 
 
 	// last, nlri
+	if(onlynlri) {
+		console.log("constructing new buffer for only nlri");
+		buf = new Buffer(4);
+		bp = 0;
+	}
 	buf.writeUInt8(24, bp);
 	bp++;
 	localdata[0].split(".").forEach(function(ed){
-		//console.log("Writing in nlri: "+ed);
+		console.log("Writing in nlri: "+ed);
 		buf.writeUInt8(parseInt(ed), bp);
 		bp++;
 	});
+
+	console.log("buf is:");
+	console.log(buf);
+	console.log(buf.length);
 
 	return buf;
 }
