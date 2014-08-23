@@ -22,6 +22,10 @@ var timerIntervalObject;
 var currentCon = 0;
 var sequentialIPs = true;
 var usePrivateRanges = false;
+var randomNextHop = false;
+var timeBetweenUpdates = 1000;
+var routesPerUpdate = 100;
+var updatesPerInterval = 20;
 
 // ---- vars
 
@@ -100,6 +104,9 @@ function startCLI() {
 		case "t":
 			toggleIPChoice();
 			break;
+		case "m":
+			toggleRandomNextHop();
+			break;
 		case "s":
 			printStatus();
 			break;
@@ -123,6 +130,21 @@ function startCLI() {
 	});
 }
 
+
+function printStatus() {
+	console.log("---- Status ----");
+	console.log("Currently "+cState);
+	console.log("Private ranges: "+usePrivateRanges);
+	console.log("Sequential publication: "+sequentialIPs);
+	console.log("Random NextHop: "+randomNextHop);
+	console.log("Number of connected peers: " + nCons);
+	console.log("Number of routes published: " + nSent);
+	console.log("My IP address: " + myIP);
+	console.log("My ASN: " + myAS);
+	console.log("Current IP (for sequential publications): " + currentIPa + "." + currentIPb + "." + currentIPc + "0/24");
+	console.log("AS path table size: "+asPaths.length);
+}
+
 function togglePrivateRange() {
 	if(usePrivateRanges) {
 		console.log("Switching off private range publication");
@@ -141,7 +163,17 @@ function toggleIPChoice() {
 		console.log("Switching to sequential IP addresses");
 		sequentialIPs = true;
 	}
-	
+}
+
+
+function toggleRandomNextHop() {
+	if(randomNextHop) {
+		randomNextHop = false;
+		console.log("Switching form random next-hop to next-hop-self");
+	} else {
+		randomNextHop = true;
+		console.log("Switching form next-hop-self to random next-hop");
+	}
 	
 }
 
@@ -157,6 +189,7 @@ function printCLIUsage() {
 	console.log("\tu - start sending route updates to connected peers");
 	console.log("\tp - pause sending route updates to connected peers");
 	console.log("\ta - toggle use of private ranges");
+	console.log("\tm - toggle between random next hop and my ip as next hop (randomise last octet - assumes /24 on the ip address of this node)");
 	console.log("\ts - status");
 	console.log("\tt - toggles between random and sequential addressing");
 	console.log("\tr - reset IP range back to beginning");
@@ -247,7 +280,7 @@ function startUpdates() {
 	// here goes nothing
 	console.log("LOG: starting update sending");
 	updateState("sending");
-	timerIntervalObject = setInterval(sendUpdate, 5);
+	timerIntervalObject = setInterval(sendUpdate, timeBetweenUpdates);
 	//console.log("LOG: stopped sending updates");
 }
 
@@ -259,8 +292,8 @@ function sendUpdate()
 		clearInterval(timerIntervalObject);
 		updateState("ready");
 	} else {
-		for(var i=0; i<10; i++) {
-			var msg = constructUpdateMessage(100);
+		for(var i=0; i<updatesPerInterval; i++) {
+			var msg = constructUpdateMessage(routesPerUpdate);
 			currentCon.write(msg);
 		}
 	}
@@ -334,6 +367,16 @@ function startServer() {
 
 // -------------- BGP 
 
+function getRandomNextHop() {
+	ipa = 1+Math.round(Math.random()*120);
+	ipb = 1+Math.round(Math.random()*254);
+	ipc = 1+Math.round(Math.random()*254);
+	ipd = 1+Math.round(Math.random()*254);
+	
+	return ipa+"."+ipb+"."+ipc+"."+ipd;
+
+}
+
 function getNextIP() {
 	// split into octets
 	//var currentIPa = 1;
@@ -376,6 +419,10 @@ function getNextIP() {
 		ipb = 1+Math.round(Math.random()*254);
 		ipc = 1+Math.round(Math.random()*254);
 		
+		
+		// TODO remove this
+		ipa = 1;
+		ipb = 1;
 		
 		if(!usePrivateRanges) {
 			if(ipb == 168 && ipa == 192) ipb++;
@@ -491,11 +538,26 @@ function constructUpdateMessage(n_up) {
 	bp++;
 	buf.writeUInt8(4, bp);
 	bp++;
+	
+//	if(randomNextHop) {
+//		rnh = getRandomNextHop();
+//		rnh.split(".").forEach(function (ed) {
+//			//console.log("writing in next hop info: " + ed);
+//			buf.writeUInt8(parseInt(ed), bp);
+//			bp++;
+//		});
 	myIP.split(".").forEach(function (ed) {
 		//console.log("writing in next hop info: " + ed);
 		buf.writeUInt8(parseInt(ed), bp);
 		bp++;
-	}); 
+	});
+	
+	if(randomNextHop) {
+		nhns = Math.round(1+(Math.random()*250));
+		bp--
+		buf.writeUInt8(nhns, bp);
+		bp++;
+	}
 
 	// last, nlri
 	for(var nn=0; nn < n_up; nn++) {
