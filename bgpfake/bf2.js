@@ -18,7 +18,10 @@ var cState = "starting";
 var currentIPa = 1;
 var currentIPb = 0;
 var currentIPc = 0;
-
+var timerIntervalObject;
+var currentCon = 0;
+var sequentialIPs = true;
+var usePrivateRanges = false;
 
 // ---- vars
 
@@ -86,6 +89,17 @@ function startCLI() {
 		case "h":
 			printCLIUsage();
 			break;
+		case "r":
+			currentIPa = 1;
+			currentIPb = 0;
+			currentIPc = 0;
+			break;
+		case "a":
+			togglePrivateRange();
+			break;
+		case "t":
+			toggleIPChoice();
+			break;
 		case "s":
 			printStatus();
 			break;
@@ -105,12 +119,31 @@ function startCLI() {
 			break;
 		}
 		
-		rl.setPrompt(currentPrompt);
-		rl.prompt();
+		doPrompt();
 	});
 }
 
+function togglePrivateRange() {
+	if(usePrivateRanges) {
+		console.log("Switching off private range publication");
+		usePrivateRanges = false;
+	} else {
+		console.log("Switching on private range publication");
+		usePrivateRanges = true;
+	}
+}
 
+function toggleIPChoice() {
+	if(sequentialIPs) {
+		sequentialIPs = false;
+		console.log("Switching to random IP addresses");
+	} else {
+		console.log("Switching to sequential IP addresses");
+		sequentialIPs = true;
+	}
+	
+	
+}
 
 function doPrompt() {
 	updatePrompt();
@@ -123,10 +156,64 @@ function printCLIUsage() {
 	console.log("\th[elp],? - this help menu");	
 	console.log("\tu - start sending route updates to connected peers");
 	console.log("\tp - pause sending route updates to connected peers");
+	console.log("\ta - toggle use of private ranges");
 	console.log("\ts - status");
+	console.log("\tt - toggles between random and sequential addressing");
+	console.log("\tr - reset IP range back to beginning");
 	console.log("\tq[uit],exit,end - Quit");
 	console.log("Prompt layout");
-	console.log("\t(AS/IP) state:connections/updates sent");
+	console.log("\t(AS/IP) state:connections/updates-sent (current-route)");
+}
+
+function updateState(newstate) {
+	if(cState == newstate) {
+		doPrompt();
+		return;
+	}
+	
+	//starting
+	if(newstate == "starting") {
+		cState = newstate;
+		doPrompt();
+		return;
+	}
+	
+	// idle
+	if(newstate == "idle") {
+		cState = newstate;
+		doPrompt();
+		return;
+	}
+
+	// connected
+	if(newstate == "connected") {
+		cState = newstate;
+		doPrompt();
+		return;
+	}
+	
+	// ready
+	if(newstate == "ready") {
+		if(cState == "sending") return;
+		cState = newstate;
+		doPrompt();
+		return;
+	}
+
+	// sending
+	if(newstate == "sending") {
+		cState = newstate;
+		doPrompt();
+		return;
+	}
+	
+	if(newstate == "stopping") {
+		cState = "stopping";
+		doPrompt();
+		return;
+	}
+
+	
 }
 
 // ------------- CLI
@@ -146,7 +233,48 @@ function printCLIUsage() {
 //------------- network
 
 function startUpdates() {
+	if(cState == "sending") {
+		console.log("LOG: already sending...");
+		return;
+	}
 	
+	if(cState != "ready") {
+		console.log("LOG: not ready to send yet");
+		return;
+	}
+	
+	
+	// here goes nothing
+	console.log("LOG: starting update sending");
+	updateState("sending");
+	timerIntervalObject = setInterval(sendUpdate, 5);
+	//console.log("LOG: stopped sending updates");
+}
+
+
+function sendUpdate()
+{
+	if(cState != "sending") {
+		console.log("oh, your killing me now?");
+		clearInterval(timerIntervalObject);
+		updateState("ready");
+	} else {
+		for(var i=0; i<10; i++) {
+			var msg = constructUpdateMessage(100);
+			currentCon.write(msg);
+		}
+	}
+	
+}
+
+
+function stopUpdates() {
+	if(cState != "sending") {
+		console.log("LOG: not in a sending state, cant pause.");
+		return;
+	}
+	
+	updateState("stopping");
 }
 
 function serverconnection(c) {
@@ -156,18 +284,27 @@ function serverconnection(c) {
 	c.on("end", function() {
 		//console.log("Server disconnected");
 		nCons--;
-		if(nCons == 0) {
+		if(nCons < 1) {
 			cState = "idle";
 			doPrompt();
 		}
+		currentCon = 0;
 	});
 
 	c.on("data", function(buffer) {
 		parseBuffer(buffer, c);
 	});
+	
 
+	currentCon = c;
+	
 	cState = "connected";
 	nCons++;
+	doPrompt();
+	
+
+
+	console.log("LOG: connection from "+c.remoteAddress);
 	doPrompt();
 
 	//c.write("hello\r\n");
@@ -177,7 +314,7 @@ function serverconnection(c) {
 function startServer() {
 	server = net.createServer(serverconnection);
 
-	server.listen(10179, function() {
+	server.listen(179, function() {
 		//console.log("LOG: Server bound");
 		doPrompt();
 	});
@@ -203,35 +340,68 @@ function getNextIP() {
 	//var currentIPb = 0;
 	//var currentIPc = 0;
 
-	currentIPc++;
-	if(currentIPc > 254) {
-		
-		currentIPb++;
-		if(currentIPb == 168 && currentIPa == 192) currentIPb++;
-		if(currentIPb > 254) {
-			currentIPa++;
+	
+	if(sequentialIPs) {
+		currentIPc++;
+		if(currentIPc > 254) {
 			
-			// dont publish bogons or 127
-			if(currentIPa == 10) currentIPa++;
-			if(currentIPa == 127) currentIPa++;
-			if(currentIPa == 128) currentIPa++;			
+			currentIPb++;
+			currentIPc = 0;
+			if(!usePrivateRanges) if(currentIPb == 168 && currentIPa == 192) currentIPb++;
+			if(currentIPb > 254) {
+				currentIPa++;
+				currentIPb = 0;
+				
+				// dont publish bogons or 127
+				if(!usePrivateRanges) {
+					if(currentIPa == 10) currentIPa++;
+					if(currentIPa == 127) currentIPa++;
+					if(currentIPa == 128) currentIPa++;			
+					if(currentIPa == 172) currentIPa++;
+				}
+			}
 		}
+		
+		if(currentIPa > 223) {
+			console.log("LOG: hit the end of the range, wrapping");
+			currentIPa = 1;
+			currentIPb = 0;
+			currentIPc = 0;
+		}
+		
+		//console.log("created "+a+"."+b+"."+c+" from "+i);
+		return currentIPa+"."+currentIPb+"."+currentIPc;
+	} else {
+		ipa = 1+Math.round(Math.random()*223);
+		ipb = 1+Math.round(Math.random()*254);
+		ipc = 1+Math.round(Math.random()*254);
+		
+		
+		if(!usePrivateRanges) {
+			if(ipb == 168 && ipa == 192) ipb++;
+			if(ipa == 10) ipa++;
+			if(ipa == 127) ipa++;
+			if(ipa == 128) ipa++;			
+			if(ipa == 172) ipa++;
+		}			
+
+		return ipa+"."+ipb+"."+ipc;
 	}
-	
-	
-	//console.log("created "+a+"."+b+"."+c+" from "+i);
-	return currentIPa+"."+currentIPb+"."+currentIPc;
 
 }
 
 function getASPath() {
+	var n = Math.random();
 	
+	return asPaths[Math.round(asPaths.length*n)];
 }
 
-function constructUpdateMessage(n_up, myas, myip) {
+function constructUpdateMessage(n_up) {
 	var bsize = 0;
 
 	var aspath = getASPath();
+	//console.log("aspath is");
+	//console.log(aspath);
 	
 	// first the header components
 	bsize += 16;
@@ -306,7 +476,7 @@ function constructUpdateMessage(n_up, myas, myip) {
 	buf.writeUInt8(aspath.length+1, bp);
 	bp++;
 	//console.log("writing in my aspath: "+myas);
-	buf.writeUInt16BE(myas, bp);
+	buf.writeUInt16BE(myAS, bp);
 	bp+=2;
 	aspath.forEach(function (ed) {
 		//console.log("writing in aspath: "+ed);
@@ -321,7 +491,7 @@ function constructUpdateMessage(n_up, myas, myip) {
 	bp++;
 	buf.writeUInt8(4, bp);
 	bp++;
-	myip.split(".").forEach(function (ed) {
+	myIP.split(".").forEach(function (ed) {
 		//console.log("writing in next hop info: " + ed);
 		buf.writeUInt8(parseInt(ed), bp);
 		bp++;
@@ -329,6 +499,7 @@ function constructUpdateMessage(n_up, myas, myip) {
 
 	// last, nlri
 	for(var nn=0; nn < n_up; nn++) {
+		//console.log("bsize: "+bsize+" bp "+bp);
 		buf.writeUInt8(24, bp);
 		bp++;
 		var ip = getNextIP();
@@ -338,10 +509,13 @@ function constructUpdateMessage(n_up, myas, myip) {
 			bp++;
 		});
 	}
+	
+	
+	nSent += n_up;
 
-	console.log("buf is:");
-	console.log(buf);
-	console.log(buf.length);
+	//console.log("buf is:");
+	//console.log(buf);
+	//console.log(buf.length);
 
 	return buf;
 }
@@ -381,11 +555,11 @@ function parseBuffer(b, c) {
 		var ot3 = b.readUInt8(26);
 		var ot4 = b.readUInt8(27);
 		var opl = b.readUInt8(28);
-		console.log("got open type, vers: "+vers+", as: " + as);
-		console.log("ht: " + ht + ", id: "+ot1+"."+ot2+"."+ot3+"."+ot4+", opl: "+opl);
+		//console.log("got open type, vers: "+vers+", as: " + as);
+		//console.log("ht: " + ht + ", id: "+ot1+"."+ot2+"."+ot3+"."+ot4+", opl: "+opl);
 
 
-		console.log("sending our open type");
+		//console.log("sending our open type");
 		var out = new Buffer(29);
 
 
@@ -393,7 +567,7 @@ function parseBuffer(b, c) {
 		out.writeUInt16BE(29, 16);
 		out.writeUInt8(1, 18);
 		out.writeUInt8(4, 19);
-		out.writeUInt16BE(myas, 20);
+		out.writeUInt16BE(myAS, 20);
 		out.writeUInt16BE(90, 22);
 		out.writeUInt8(10, 24);
 		out.writeUInt8(99, 25);
@@ -403,18 +577,75 @@ function parseBuffer(b, c) {
 
 		c.write(out);
 	} else if(type == 4) {
-		console.log("writing keepalive - exact as sent");
+		//console.log("writing keepalive - exact as sent");
+		console.log("LOG: keepalive from remote ("+c.remoteAddress+")");
 		c.write(b);
 		readyToSend = true;
+		updateState("ready");
 		//if(updateSent ==0) beginUpdateSend(c);
 	} else if(type == 2) {
-		console.log("got update...");
-		if(updateSent ==0) beginUpdateSend(c);
+		//console.log("got update...");
+		console.log("LOG: update from remote ("+c.remoteAddress+")");
+		readyToSend = true;
+		updateState("ready");
+	} else if(type == 3) {
+		var loc = b.readUInt8(19);
+		var msg = b.readUInt8(20);
+		var fromremote = parseNotifyMessage(loc, msg);
+		console.log("LOG: Notification message from server ("+loc+"/"+msg+"): " + fromremote);
 	} else {
-		console.log("sending end...");
+		//console.log("sending end...");
 		c.end();
 	}
 
+	doPrompt();
+	
+}
+
+function parseNotifyMessage(loc, msg) {
+	var retmsg = "";
+	switch(loc) {
+		case 1:
+			retmsg += "Header Error - ";
+			if(msg == 1) retmsg += "Not Synchronised";
+			else if(msg == 2) retmsg += "Bad Message Length";
+			else if(msg == 3) retmsg += "Bad Message Type";
+			else retmsg += "Unknown error code: "+msg;
+			break;
+		case 2:
+			retmsg += "Open Error - ";
+			if(msg == 1) retmsg += "Unsupported Version";
+			else if(msg == 2) retmsg += "AS Missmatch";
+			else if(msg == 3) retmsg += "Bad BGP ID";
+			else if(msg == 4) retmsg += "Unsupported Option Parameter";
+			else retmsg += "Unknown error code: "+msg;
+			break;
+		case 3:
+			retmsg += "Update Error - ";
+			if(msg == 1) retmsg += "Malformed attribute list";
+			else if(msg == 2) retmsg += "Unknown recognised well-known attribute";
+			else if(msg == 3) retmsg += "Missing well-known attribute";
+			else if(msg == 4) retmsg += "Attribute flag error";
+			else if(msg == 5) retmsg += "Attribute length error";
+			else if(msg == 6) retmsg += "Invalid origin attribute";
+			else if(msg == 7) retmsg += "Deprecated error message (other end is waaay too old)";
+			else if(msg == 8) retmsg += "Invalid next hop attribute";
+			else if(msg == 9) retmsg += "Optional attribute error";
+			else if(msg == 10) retmsg += "Invalid network field";
+			else if(msg == 11) retmsg += "Malformed AS path";
+			else retmsg += "Unknown error code: "+msg;
+			break;
+		case 4:
+			retmsg += "Hold Timer Expired - ";
+			break;
+		case 5:
+			retmsg += "Finite State Machine error - "+msg;
+			break;
+		default:
+			retmsg += "Unknown erorr type - "+msg; 
+	}
+	
+	return retmsg;
 	
 }
 
