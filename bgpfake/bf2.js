@@ -23,9 +23,9 @@ var currentCon = 0;
 var sequentialIPs = true;
 var usePrivateRanges = false;
 var randomNextHop = false;
-var timeBetweenUpdates = 1000;
+var timeBetweenUpdates = 20;
 var routesPerUpdate = 100;
-var updatesPerInterval = 20;
+var updatesPerInterval = 40;
 
 // ---- vars
 
@@ -419,10 +419,6 @@ function getNextIP() {
 		ipb = 1+Math.round(Math.random()*254);
 		ipc = 1+Math.round(Math.random()*254);
 		
-		
-		// TODO remove this
-		ipa = 1;
-		ipb = 1;
 		
 		if(!usePrivateRanges) {
 			if(ipb == 168 && ipa == 192) ipb++;

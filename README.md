@@ -35,15 +35,3 @@ The nodejs template currently doesnt work as it stands but in the long term what
 5) setup the init nodejs script
 6) ... magic!
 
-
-
-
-
-BGP Daemon in Node.js
-=====================
-
-simple implementation of the bgp protocol stack - set your ip address and your AS and it'll publish a
-number of prefixes (can be changed part way down the code - up to about a million prefixes works without
-much drama)
-
-
